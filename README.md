@@ -204,6 +204,116 @@ _Staticly sets the green channel on 50% brightness_
 \* In the case of a white channel being used in an RGB light fixture, the white channel is automatically calculated.
 
 
+## Fixtures (Moving Heads, RGBWA-Spots)
+
+Neben den einzelnen Lichtern unter `light:` kennt diese Version **Lampentypen**. Eine DMX-Tabelle (Personality) wird einmal beschrieben, jede Lampe bekommt nur noch Typ und Startadresse. Jede Lampe erscheint in Home Assistant als **ein Gerät** mit:
+
+| Entität | Art | Inhalt |
+| --- | --- | --- |
+| `light.<name>` | Licht | Helligkeit, Farbe (HS) und Weiß (Farbtemperatur), daraus wird RGBWA gemischt |
+| `number.<name>_pan` / `_tilt` | Zahl | Position in Grad (mit `pan_range`/`tilt_range`) oder %, 16 Bit mit `*_fine` |
+| `number.<name>_zoom` / `_fokus` / `_strobe` | Zahl | 0–100 % |
+| `number.<name>_amber` | Zahl | nur bei `color_mix: manual` |
+| `select.<name>_gobo` | Auswahl | Gobo-Namen aus dem Lampentyp |
+| `select.<name>_kalibrierung` | Auswahl | schaltet zum Messen einzelne Farbkanäle auf 100 % |
+| `button.<name>_reset` | Taste | hält den Reset-Wert für `hold` Sekunden |
+
+Nur die Licht-Entität ist ein Licht. "Alle Lichter aus" schaltet also die Lampe dunkel, bewegt aber die Köpfe nicht. Alle Werte werden gespeichert und nach einem Neustart sofort wieder ausgegeben.
+
+### Konfiguration
+
+```yaml
+artnet_led:
+  fixture_types:
+    ml_19x13_16ch:            # 19x13 LED Moving Head, 16-Kanal-Modus
+      pan: 1
+      pan_fine: 13
+      tilt: 2
+      tilt_fine: 14
+      dimmer: 4
+      red: 5
+      green: 6
+      blue: 7
+      white: 8
+      strobe: 9               # 0 = offen
+      focus: 10
+      reset: {channel: 15, value: 255, hold: 6}
+      static: {3: 0, 11: 0, 12: 0, 16: 0}   # Geschwindigkeit, Makro, CTO
+      pan_range: 540
+      tilt_range: 270
+    spot_rgbwa:
+      dimmer: 1
+      red: 2
+      green: 3
+      blue: 4
+      white: 5
+      amber: 6
+  nodes:
+    - host: 10.49.55.200      # Art-Net-Node
+      node_type: artnet-direct
+      max_fps: 25
+      refresh_every: 1
+      universes:
+        0:
+          fixtures:
+            - channel: 101
+              name: ML Saal 1 links
+              fixture_type: ml_19x13_16ch
+            - channel: 120
+              name: Spot Foyer
+              fixture_type: spot_rgbwa
+```
+
+Kanalnummern im Lampentyp sind relativ zur Startadresse (1 = Startadresse). Wird derselbe Node auch unter `light:` verwendet, teilen sich beide denselben Sender. Überlappende Adressen werden beim Start gemeldet.
+
+**Funktionen im Lampentyp**
+
+| Schlüssel | Wert |
+| --- | --- |
+| `dimmer`, `red`, `green`, `blue`, `white`, `amber`, `pan`, `tilt`, `strobe`, `zoom`, `focus` | Kanal, oder `{channel, min, max}` für einen eingeschränkten DMX-Bereich |
+| `dimmer_fine`, `pan_fine`, `tilt_fine`, `zoom_fine`, `focus_fine` | Fein-Kanal für 16 Bit (muss nicht neben dem Grob-Kanal liegen) |
+| `reset` | Kanal, oder `{channel, value: 255, hold: 6, idle: 0}` |
+| `gobo` | `{channel, values: {Offen: 0, Stern: 40, ...}}` |
+| `static` | `{kanal: wert}`, feste Werte für Kanäle, die HA nicht bedient |
+| `pan_range`, `tilt_range` | Grad, für die Anzeige |
+| `color_mix` | `auto` (Standard), `calibrated` oder `manual` |
+| `emitters` | gemessene Farborte für `calibrated` |
+| `min_temp`, `max_temp` | Farbtemperatur-Bereich, Standard 2700K–6500K |
+
+### Farbmischung
+
+* `auto`: Faustregel. Der Weißanteil geht auf W, der Orange-/Gelbanteil auf A, der Rest auf RGB.
+* `calibrated`: rechnet mit den gemessenen Primärvalenzen der Lampe. Gesucht wird die Mischung, die den Ziel-Farbort (HS über sRGB, Farbtemperatur über die Planck-Kurve) exakt trifft und dabei am hellsten ist. Farben außerhalb des Lampen-Gamuts werden in Richtung Weiß entsättigt. Fehlt für einen Farbkanal der Farbort, gilt `auto`.
+* `manual`: RGBW-Farbwähler plus eigener Amber-Regler.
+
+```yaml
+      color_mix: calibrated
+      emitters:               # jeder Kanal einzeln auf 100 %, Dimmer 100 %
+        red:   {x: 0.700, y: 0.299, Y: 412}
+        green: {x: 0.170, y: 0.720, Y: 1180}
+        blue:  {x: 0.135, y: 0.055, Y: 160}
+        white: {x: 0.313, y: 0.329, Y: 1650}
+        amber: {x: 0.575, y: 0.420, Y: 690}
+```
+
+Messung: Lampe 15 Minuten warmlaufen lassen, über `select.<name>_kalibrierung` nacheinander jeden Kanal auf 100 % schalten und x, y, Y messen (gleicher Abstand, nur die Verhältnisse von Y zählen). Zur Kontrolle "Alle" messen; die Summe der Einzelmessungen sollte innerhalb weniger Prozent passen.
+
+### Dashboard-Karte
+
+Die Integration bringt die Karte `custom:artnet-fixture-card` mit, sie wird automatisch geladen.
+
+```yaml
+type: custom:artnet-fixture-card
+entity: light.ml_saal_1_links
+step_fine: 1          # Pfeilschritt in ° (bzw. %)
+step_coarse: 10
+home: {pan: 270, tilt: 135}
+scenes:
+  - scene.ml_buehne_mitte
+```
+
+Die Karte zeigt ein Pan/Tilt-Feld zum Ziehen, Pfeiltasten (fein/grob), Grundposition, Helligkeit, Zoom/Fokus/Strobe, Gobo, Szenen-Tasten und Reset mit Rückfrage. Die Farbe wird über "Farbe" im normalen HA-Farbdialog gewählt. Positionen speichert man als HA-Szenen (Licht + Pan + Tilt + Fokus).
+
 ## Supported features
 
 - Color-Mode. 

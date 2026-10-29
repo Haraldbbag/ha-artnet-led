@@ -1,0 +1,8 @@
+{
+  "config": {
+    "abort": {
+      "yaml_only": "Fixtures are configured in configuration.yaml under 'artnet_led:'.",
+      "already_configured": "Already configured."
+    }
+  }
+}

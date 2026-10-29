@@ -1,0 +1,8 @@
+{
+  "config": {
+    "abort": {
+      "yaml_only": "Lampen werden in der configuration.yaml unter 'artnet_led:' eingerichtet.",
+      "already_configured": "Bereits eingerichtet."
+    }
+  }
+}
