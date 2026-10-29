@@ -1,0 +1,49 @@
+artnet_led:
+  fixture_types:
+    ml_19x13_16ch:
+      pan: 1
+      pan_fine: 13
+      tilt: 2
+      tilt_fine: 14
+      dimmer: 4
+      red: 5
+      green: 6
+      blue: 7
+      white: 8
+      strobe: 9
+      focus: 10
+      reset: {channel: 15, value: 255, hold: 1}
+      static: {3: 0, 11: 0, 12: 0, 16: 0}
+      pan_range: 540
+      tilt_range: 270
+    spot_rgbwa:
+      dimmer: 1
+      red: 2
+      green: 3
+      blue: 4
+      white: 5
+      amber: 6
+  nodes:
+    - host: 127.0.0.1
+      port: 6455
+      refresh_every: 0
+      universes:
+        0:
+          fixtures:
+            - channel: 101
+              name: ML Saal 1 links
+              fixture_type: ml_19x13_16ch
+            - channel: 120
+              name: Spot Foyer
+              fixture_type: spot_rgbwa
+light:
+  - platform: artnet_led
+    host: 127.0.0.1
+    port: 6455
+    refresh_every: 0
+    universes:
+      0:
+        devices:
+          - channel: 1
+            name: old_dimmer
+            type: dimmer

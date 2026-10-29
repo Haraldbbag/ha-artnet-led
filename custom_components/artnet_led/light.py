@@ -34,13 +34,10 @@ from homeassistant.util.color import color_rgb_to_rgbw
 from pyartnet import BaseUniverse, Channel
 from pyartnet.errors import UniverseNotFoundError
 
-from custom_components.artnet_led.bridge.artnet_controller import ArtNetController
 from custom_components.artnet_led.bridge.channel_bridge import ChannelBridge
 from custom_components.artnet_led.util.channel_switch import clamp_color_temp_kelvin, from_values, to_values, validate
 
-ARTNET_DEFAULT_PORT = 6454
-SACN_DEFAULT_PORT = 5568
-KINET_DEFAULT_PORT = 6038
+from custom_components.artnet_led.nodes import NODES, async_get_node
 
 CONF_DEVICE_TRANSITION = ATTR_TRANSITION
 
@@ -81,14 +78,8 @@ CHANNEL_SIZE: dict[str, ChannelSize] = {
     "32bit": (4, 256 ** 3),
 }
 
-NODES = {}
-
 
 async def async_setup_platform(hass: HomeAssistant, config, async_add_devices, discovery_info=None):
-    # pyartnet expects the created asyncio task to be the task running its wrapper.
-    # Home Assistant's task factory can wrap tasks, which breaks pyartnet's assertions.
-    pyartnet.base.background_task.CREATE_TASK = asyncio.create_task
-
     client_type = config.get(CONF_NODE_TYPE)
     max_fps = config.get(CONF_NODE_MAX_FPS)
     refresh_interval = config.get(CONF_NODE_REFRESH)
@@ -96,81 +87,12 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_devices, d
     host = config.get(CONF_NODE_HOST)
     port = config.get(CONF_NODE_PORT)
 
-    real_host = config.get(CONF_NODE_HOST_OVERRIDE)
-    if len(real_host) == 0:
-        real_host = host
-    real_port = config.get(CONF_NODE_PORT_OVERRIDE)
-    if real_port == None:
-        real_port = port
-
-    # setup Node
-    node: pyartnet.base.BaseNode
-    if client_type == "artnet-direct":
-        if real_port is None:
-            real_port = ARTNET_DEFAULT_PORT
-
-        __id = f"{host}:{port}"
-        if __id not in NODES:
-            from pyartnet.base.network import UnicastNetworkTarget
-            __node = pyartnet.ArtNetNode(
-                UnicastNetworkTarget.create(real_host, real_port),
-                max_fps=max_fps,
-                refresh_every=refresh_interval,
-            )
-            await __node.__aenter__()
-            if not refresh_interval:
-                await __node.stop_refresh()
-            NODES[__id] = __node
-
-        node = NODES[__id]
-
-    elif client_type == "artnet-controller":
-        if "server" not in NODES:
-            __node = ArtNetController(hass, max_fps=max_fps, refresh_every=refresh_interval)
-            NODES["server"] = __node
-            __node.start()
-        node = NODES["server"]
-
-    elif client_type == "sacn":
-        if real_port is None:
-            real_port = SACN_DEFAULT_PORT
-
-        __id = f"{host}:{port}"
-        if __id not in NODES:
-            from pyartnet.base.network import UnicastNetworkTarget
-            __node = pyartnet.SacnNode(
-                UnicastNetworkTarget.create(real_host, real_port),
-                max_fps=max_fps,
-                refresh_every=refresh_interval,
-                source_name="ha-artnet-led"
-            )
-            await __node.__aenter__()
-            if not refresh_interval:
-                await __node.stop_refresh()
-            NODES[__id] = __node
-
-        node = NODES[__id]
-    elif client_type == "kinet":
-        if real_port is None:
-            real_port = KINET_DEFAULT_PORT
-
-        __id = f"{host}:{port}"
-        if __id not in NODES:
-            from pyartnet.base.network import UnicastNetworkTarget
-            __node = pyartnet.KiNetNode(
-                UnicastNetworkTarget.create(real_host, real_port),
-                max_fps=max_fps,
-                refresh_every=refresh_interval,
-            )
-            await __node.__aenter__()
-            if not refresh_interval:
-                await __node.stop_refresh()
-            NODES[__id] = __node
-
-        node = NODES[__id]
-
-    else:
-        raise NotImplementedError(f"Unknown client type '{client_type}'")
+    # setup Node (shared with the fixtures from the artnet_led: block)
+    node: pyartnet.base.BaseNode = await async_get_node(
+        hass, client_type, host, port,
+        config.get(CONF_NODE_HOST_OVERRIDE), config.get(CONF_NODE_PORT_OVERRIDE),
+        max_fps, refresh_interval,
+    )
 
     entity_registry = async_get(hass)
 
@@ -179,6 +101,12 @@ async def async_setup_platform(hass: HomeAssistant, config, async_add_devices, d
     for universe_nr, universe_cfg in config[CONF_NODE_UNIVERSES].items():
         try:
             universe = node.get_universe(universe_nr)
+            # a universe opened first by the fixtures still needs this platform's correction
+            if getattr(universe, "_artnet_led_by_fixtures", False):
+                universe._artnet_led_by_fixtures = False
+                universe.set_output_correction(AVAILABLE_CORRECTIONS.get(
+                    universe_cfg[CONF_OUTPUT_CORRECTION]
+                ))
         except UniverseNotFoundError:
             universe: BaseUniverse = node.add_universe(universe_nr)
             universe.set_output_correction(AVAILABLE_CORRECTIONS.get(
@@ -1115,3 +1043,16 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     required=True,
     extra=vol.PREVENT_EXTRA,
 )
+
+
+# ------------------------------------------------------------------------------
+# fixtures (artnet_led: block, set up through the config entry)
+# ------------------------------------------------------------------------------
+
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
+    from custom_components.artnet_led.fixture.entity import fixtures_of
+    from custom_components.artnet_led.fixture.light_entity import FixtureLight, light_color_modes
+
+    async_add_entities(
+        FixtureLight(f) for f in fixtures_of(hass) if light_color_modes(f.fixture_type)
+    )
