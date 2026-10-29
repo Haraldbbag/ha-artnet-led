@@ -248,6 +248,13 @@ artnet_led:
       blue: 4
       white: 5
       amber: 6
+      color_mix: calibrated   # optional, sonst auto
+      emitters:               # gilt für alle Lampen dieses Typs; Platzhalterwerte, selbst messen
+        red:   {x: 0.700, y: 0.299, Y: 412}
+        green: {x: 0.170, y: 0.720, Y: 1180}
+        blue:  {x: 0.135, y: 0.055, Y: 160}
+        white: {x: 0.313, y: 0.329, Y: 1650}
+        amber: {x: 0.575, y: 0.420, Y: 690}
   nodes:
     - host: 10.49.55.200      # Art-Net-Node
       node_type: artnet-direct
