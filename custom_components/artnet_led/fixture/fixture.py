@@ -18,6 +18,7 @@ from . import colormix
 from .fixture_type import (
     COLOR_MIX_CALIBRATED,
     COLOR_MIX_MANUAL,
+    OUTPUT_CORRECTIONS,
     FixtureType,
 )
 
@@ -138,11 +139,13 @@ class Fixture:
             level = 1.0
 
         colors = self.color_levels()
+        # dimming curve: on the dimmer channel if there is one, else on the colour levels
+        exp = OUTPUT_CORRECTIONS[ft.output_correction] if not calibrating else 1
         if "dimmer" in ft.channels:
-            out["dimmer"] = level
+            out["dimmer"] = level ** exp
             out.update(colors)
         else:
-            out.update({k: v * level for k, v in colors.items()})
+            out.update({k: v * level ** exp for k, v in colors.items()})
 
         out["pan"] = s.pan
         out["tilt"] = s.tilt

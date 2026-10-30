@@ -100,8 +100,10 @@ class FixtureLight(FixtureEntity, LightEntity):
         if ATTR_RGB_COLOR in kwargs:
             changes["rgbw"] = (*kwargs[ATTR_RGB_COLOR], 0)
             changes["color_mode"] = "rgb"
-        await self._fixture.async_update(transition=kwargs.get(ATTR_TRANSITION, 0), **changes)
+        await self._fixture.async_update(
+            transition=kwargs.get(ATTR_TRANSITION, self._fixture.fixture_type.transition), **changes)
 
     async def async_turn_off(self, **kwargs) -> None:
         # only the light goes dark; pan/tilt/zoom stay where they are
-        await self._fixture.async_update(transition=kwargs.get(ATTR_TRANSITION, 0), on=False)
+        await self._fixture.async_update(
+            transition=kwargs.get(ATTR_TRANSITION, self._fixture.fixture_type.transition), on=False)

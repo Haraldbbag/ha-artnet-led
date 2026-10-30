@@ -39,6 +39,9 @@ COLOR_MIX_CALIBRATED = "calibrated"
 COLOR_MIX_MANUAL = "manual"
 COLOR_MIXES = (COLOR_MIX_AUTO, COLOR_MIX_CALIBRATED, COLOR_MIX_MANUAL)
 
+# exponent of the dimming curve, same names as the light: platform
+OUTPUT_CORRECTIONS = {"linear": 1, "quadratic": 2, "cubic": 3, "quadruple": 4}
+
 DMX_CHANNEL = vol.All(vol.Coerce(int), vol.Range(min=1, max=512))
 DMX_VALUE = vol.All(vol.Coerce(int), vol.Range(min=0, max=255))
 
@@ -82,6 +85,8 @@ class FixtureType:
     emitters: dict[str, Emitter] = field(default_factory=dict)
     min_temp: int = 2700
     max_temp: int = 6500
+    output_correction: str = "linear"   # dimming curve for dimmer / colour levels
+    transition: float = 0.0              # default fade of the light in seconds
 
     @property
     def width(self) -> int:
@@ -161,6 +166,8 @@ FIXTURE_TYPE_SCHEMA = vol.Schema({
     vol.Optional("emitters", default={}): {vol.In(COLOR_ROLES): EMITTER_SCHEMA},
     vol.Optional("min_temp", default=2700): _kelvin,
     vol.Optional("max_temp", default=6500): _kelvin,
+    vol.Optional("output_correction", default="linear"): vol.In(OUTPUT_CORRECTIONS),
+    vol.Optional("transition", default=0): vol.All(vol.Coerce(float), vol.Range(min=0, max=999)),
 })
 
 
@@ -194,6 +201,7 @@ def build_fixture_type(name: str, cfg: dict) -> FixtureType:
         pan_range=cfg.get("pan_range"), tilt_range=cfg.get("tilt_range"),
         color_mix=cfg["color_mix"], emitters=emitters,
         min_temp=cfg["min_temp"], max_temp=cfg["max_temp"],
+        output_correction=cfg["output_correction"], transition=cfg["transition"],
     )
 
     # every DMX channel may be used only once
