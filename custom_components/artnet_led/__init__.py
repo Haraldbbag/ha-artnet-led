@@ -129,7 +129,9 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
         path = Path(__file__).parent / "frontend" / "artnet-fixture-card.js"
         await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(path), False)])
-        add_extra_js_url(hass, CARD_URL)
+        # version query so browsers fetch the new card after an update
+        mtime = int((await hass.async_add_executor_job(path.stat)).st_mtime)
+        add_extra_js_url(hass, f"{CARD_URL}?v={mtime}")
     except Exception:  # noqa: BLE001 - the card is optional, the fixtures still work
         log.exception("Could not register the artnet fixture card")
 

@@ -15,7 +15,7 @@
  * The card finds the other entities of the fixture (pan, tilt, zoom ...) through
  * the device and their "fixture_role" attribute.
  */
-const CARD_VERSION = "0.2.1";
+const CARD_VERSION = "0.2.2";
 
 const ROLE_LABELS = {
   zoom: "Zoom",
@@ -53,7 +53,7 @@ class ArtnetFixtureCard extends HTMLElement {
   }
 
   getGridOptions() {
-    return { columns: 6, min_columns: 4, rows: "auto" };
+    return { columns: 12, min_columns: 6, rows: "auto" };
   }
 
   set hass(hass) {
@@ -127,8 +127,8 @@ class ArtnetFixtureCard extends HTMLElement {
           padding: 8px 10px; min-height: 40px; }
         button.on { background: var(--state-light-active-color, #ffc107); color: #000; }
         button:active { filter: brightness(.9); }
-        .move { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-        .pad { position: relative; aspect-ratio: 2 / 1; border-radius: 12px; touch-action: none;
+        .move { display: flex; flex-direction: column; gap: 10px; }
+        .pad { position: relative; width: 100%; aspect-ratio: 2 / 1; min-height: 160px; border-radius: 12px; touch-action: none;
           background:
             linear-gradient(var(--divider-color, #ccc) 1px, transparent 1px) 0 0 / 100% 25%,
             linear-gradient(90deg, var(--divider-color, #ccc) 1px, transparent 1px) 0 0 / 12.5% 100%,
@@ -137,19 +137,21 @@ class ArtnetFixtureCard extends HTMLElement {
         .dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
           background: var(--primary-color, #03a9f4); box-shadow: 0 0 0 4px rgba(3,169,244,.25);
           pointer-events: none; }
-        .cross { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 4px; }
-        .cross button { padding: 0; min-height: 0; font-size: 18px; }
-        .cross .step { font-size: 12px; }
-        .pos { font-size: .85em; color: var(--secondary-text-color); margin: 6px 0 2px; display: flex; justify-content: space-between; }
+        .ctrl { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+        .cross { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 6px; }
+        .cross button { padding: 0; min-height: 0; min-width: 0; width: 48px; height: 48px; font-size: 18px; }
+        .cross button.step { font-size: 12px; }
+        .pos { font-size: .85em; color: var(--secondary-text-color); }
+        .pos.tilt { text-align: right; }
         .row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 56px; align-items: center; gap: 8px; margin-top: 8px; }
         .row label { font-size: .9em; }
         .row .val { text-align: right; font-size: .85em; color: var(--secondary-text-color); }
         input[type=range] { width: 100%; accent-color: var(--primary-color, #03a9f4); }
         select { font: inherit; padding: 6px; border-radius: 8px; width: 100%;
           background: var(--card-background-color, #fff); color: var(--primary-text-color); border: 1px solid var(--divider-color, #ccc); }
-        .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+        .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
         .buttons button { flex: 1 1 auto; }
-        .step { min-width: 64px; }
+        .buttons button.reset { flex: 0 0 auto; margin-left: auto; min-height: 30px; padding: 4px 12px; font-size: .85em; }
         .warn { color: var(--error-color, #db4437); }
       </style>
       <ha-card>
@@ -160,13 +162,16 @@ class ArtnetFixtureCard extends HTMLElement {
         ${roles.pan || roles.tilt ? `
         <div class="move">
           <div class="pad"><div class="dot"></div></div>
-          <div class="cross">
-            <span></span><button data-d="up" title="hoch">▲</button><span></span>
-            <button data-d="left" title="links">◀</button><button class="home" title="Grundposition">⌂</button><button data-d="right" title="rechts">▶</button>
-            <span></span><button data-d="down" title="runter">▼</button><button class="step" title="Schrittweite">fein</button>
+          <div class="ctrl">
+            <span class="pos pan"></span>
+            <div class="cross">
+              <span></span><button data-d="up" title="hoch">▲</button><span></span>
+              <button data-d="left" title="links">◀</button><button class="home" title="Grundposition">⌂</button><button data-d="right" title="rechts">▶</button>
+              <span></span><button data-d="down" title="runter">▼</button><button class="step" title="Schrittweite">fein</button>
+            </div>
+            <span class="pos tilt"></span>
           </div>
-        </div>
-        <div class="pos"><span class="pan"></span><span class="tilt"></span></div>` : ""}
+        </div>` : ""}
         ${roles.light ? `<div class="row"><label>Helligkeit</label><input type="range" min="0" max="100" step="1" data-role="brightness"><span class="val" data-val="brightness"></span></div>` : ""}
         ${sliders.map((r) => `<div class="row"><label>${ROLE_LABELS[r]}</label><input type="range" data-role="${r}"><span class="val" data-val="${r}"></span></div>`).join("")}
         ${roles.gobo ? `<div class="row"><label>Gobo</label><select data-role="gobo"></select><span></span></div>` : ""}
@@ -378,8 +383,8 @@ class ArtnetFixtureCard extends HTMLElement {
         this._placeDot(pan ? this._toPad("pan", pan.value) : 0.5, tilt ? this._toPad("tilt", tilt.value) : 0.5);
       }
       const fmt = (label, n) => (n && n.value !== null ? `${label} ${Math.round(n.value * 10) / 10}${n.unit ? " " + n.unit : ""}` : "");
-      root.querySelector(".pos .pan").textContent = fmt("Pan", pan);
-      root.querySelector(".pos .tilt").textContent = fmt("Tilt", tilt);
+      root.querySelector(".pos.pan").textContent = fmt("Pan", pan);
+      root.querySelector(".pos.tilt").textContent = fmt("Tilt", tilt);
     }
     const reset = root.querySelector(".reset");
     if (reset && roles.reset) {
