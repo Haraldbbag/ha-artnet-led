@@ -15,7 +15,7 @@
  * The card finds the other entities of the fixture (pan, tilt, zoom ...) through
  * the device and their "fixture_role" attribute.
  */
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.2.1";
 
 const ROLE_LABELS = {
   zoom: "Zoom",

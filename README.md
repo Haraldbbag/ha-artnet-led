@@ -286,6 +286,8 @@ Kanalnummern im Lampentyp sind relativ zur Startadresse (1 = Startadresse). Wird
 | `color_mix` | `auto` (Standard), `calibrated` oder `manual` |
 | `emitters` | gemessene Farborte für `calibrated` |
 | `min_temp`, `max_temp` | Farbtemperatur-Bereich, Standard 2700K–6500K |
+| `output_correction` | Dimmkurve `linear` (Standard), `quadratic`, `cubic`, `quadruple`; gilt für den Dimmer-Kanal, ohne Dimmer für die Farbkanäle. Pan/Tilt/Zoom bleiben linear |
+| `transition` | Standard-Überblendzeit des Lichts in Sekunden (wie bei `light:`) |
 
 ### Farbmischung
 

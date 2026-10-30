@@ -273,3 +273,23 @@ def test_config_schema_unknown_type_and_end():
         CONFIG_SCHEMA(_yaml([{"channel": 1, "name": "A", "fixture_type": "nope"}]))
     with pytest.raises(vol.Invalid, match="beyond 512"):
         CONFIG_SCHEMA(_yaml([{"channel": 500, "name": "A", "fixture_type": "ml_19x13_16ch"}]))
+
+
+def test_output_correction_on_colours_without_dimmer():
+    f, _ = make({**{k: v for k, v in RGBWA.items() if k != "dimmer"}, "output_correction": "quadratic"},
+                on=True, brightness=128, color_mode="hs", hs=(0, 100))
+    # red at half brightness, quadratic curve -> about a quarter
+    assert f.dmx_values()[1] == round(255 * (128 / 255) ** 2)  # red on channel 2
+
+
+def test_output_correction_on_dimmer_only():
+    f, _ = make({**ML16, "output_correction": "quadratic"}, on=True, brightness=128, pan=0.5)
+    v = f.dmx_values()
+    assert v[3] == round(255 * (128 / 255) ** 2)
+    assert (v[0] << 8 | v[12]) == round(0.5 * 65535)  # positions stay linear
+
+
+def test_default_transition_parsed():
+    ft = build_fixture_type("x", {**RGBWA, "transition": 1})
+    assert ft.transition == 1.0
+    assert build_fixture_type("y", RGBWA).transition == 0.0
