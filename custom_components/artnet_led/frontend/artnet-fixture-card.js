@@ -15,7 +15,7 @@
  * The card finds the other entities of the fixture (pan, tilt, zoom ...) through
  * the device and their "fixture_role" attribute.
  */
-const CARD_VERSION = "0.2.3";
+const CARD_VERSION = "0.2.2";
 
 const ROLE_LABELS = {
   zoom: "Zoom",
@@ -118,16 +118,16 @@ class ArtnetFixtureCard extends HTMLElement {
     root.innerHTML = `
       <style>
         :host { display: block; }
-        ha-card, .card { padding: 10px 14px 12px; display: block; }
-        .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        ha-card, .card { padding: 12px 16px 16px; display: block; }
+        .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
         .title { flex: 1; font-size: 1.15em; font-weight: 500; }
         .state { font-size: .85em; color: var(--secondary-text-color); }
         button { font: inherit; cursor: pointer; border: none; border-radius: 10px;
           background: var(--secondary-background-color, #eee); color: var(--primary-text-color);
-          padding: 4px 10px; min-height: 32px; }
+          padding: 8px 10px; min-height: 40px; }
         button.on { background: var(--state-light-active-color, #ffc107); color: #000; }
         button:active { filter: brightness(.9); }
-        .move { display: flex; flex-direction: column; gap: 8px; }
+        .move { display: flex; flex-direction: column; gap: 10px; }
         .pad { position: relative; width: 100%; aspect-ratio: 2 / 1; min-height: 160px; border-radius: 12px; touch-action: none;
           background:
             linear-gradient(var(--divider-color, #ccc) 1px, transparent 1px) 0 0 / 100% 25%,
@@ -138,20 +138,20 @@ class ArtnetFixtureCard extends HTMLElement {
           background: var(--primary-color, #03a9f4); box-shadow: 0 0 0 4px rgba(3,169,244,.25);
           pointer-events: none; }
         .ctrl { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
-        .cross { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(3, 34px); gap: 4px; }
-        .cross button { padding: 0; min-height: 0; min-width: 0; width: 38px; height: 34px; font-size: 15px; }
-        .cross button.step { font-size: 11px; }
+        .cross { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 6px; }
+        .cross button { padding: 0; min-height: 0; min-width: 0; width: 48px; height: 48px; font-size: 18px; }
+        .cross button.step { font-size: 12px; }
         .pos { font-size: .85em; color: var(--secondary-text-color); }
         .pos.tilt { text-align: right; }
-        .row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 56px; align-items: center; gap: 8px; margin-top: 4px; }
+        .row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 56px; align-items: center; gap: 8px; margin-top: 8px; }
         .row label { font-size: .9em; }
         .row .val { text-align: right; font-size: .85em; color: var(--secondary-text-color); }
         input[type=range] { width: 100%; accent-color: var(--primary-color, #03a9f4); }
         select { font: inherit; padding: 6px; border-radius: 8px; width: 100%;
           background: var(--card-background-color, #fff); color: var(--primary-text-color); border: 1px solid var(--divider-color, #ccc); }
-        .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+        .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
         .buttons button { flex: 1 1 auto; }
-        .buttons button.reset { flex: 0 0 auto; margin-left: auto; min-height: 26px; padding: 2px 12px; font-size: .85em; }
+        .buttons button.reset { flex: 0 0 auto; margin-left: auto; min-height: 30px; padding: 4px 12px; font-size: .85em; }
         .warn { color: var(--error-color, #db4437); }
       </style>
       <ha-card>
