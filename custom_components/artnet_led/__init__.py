@@ -125,15 +125,36 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         return
     try:
         from homeassistant.components.frontend import add_extra_js_url
-        from homeassistant.components.http import StaticPathConfig
 
         path = Path(__file__).parent / "frontend" / "artnet-fixture-card.js"
-        await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(path), False)])
-        # version query so browsers fetch the new card after an update
+        hass.http.register_view(_CardView(hass, path))
+        # version query so browsers fetch the new card after a restart
         mtime = int((await hass.async_add_executor_job(path.stat)).st_mtime)
         add_extra_js_url(hass, f"{CARD_URL}?v={mtime}")
     except Exception:  # noqa: BLE001 - the card is optional, the fixtures still work
         log.exception("Could not register the artnet fixture card")
+
+
+def _CardView(hass: HomeAssistant, path: Path):
+    """Serve the card with Cache-Control: no-cache.
+
+    Browsers then revalidate on every load, so a card replaced by an update
+    (HACS) is picked up without a restart and a half-written copy never sticks.
+    """
+    from aiohttp import web
+    from homeassistant.components.http import HomeAssistantView
+
+    class CardView(HomeAssistantView):
+        url = CARD_URL
+        name = "artnet_led:card"
+        requires_auth = False
+
+        async def get(self, request):  # noqa: ARG002
+            if not await hass.async_add_executor_job(path.is_file):
+                raise web.HTTPNotFound()
+            return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+
+    return CardView()
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
