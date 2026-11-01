@@ -12,10 +12,13 @@
  *   scenes:                           # optional position / look buttons
  *     - scene.ml_buehne_mitte
  *
+ * Pan and tilt can also be typed in the fields next to the arrow pad
+ * (Enter or leaving the field sends, Esc reverts, out-of-range values are refused).
+ *
  * The card finds the other entities of the fixture (pan, tilt, zoom ...) through
  * the device and their "fixture_role" attribute.
  */
-const CARD_VERSION = "0.2.2";
+const CARD_VERSION = "0.2.4";
 
 const ROLE_LABELS = {
   zoom: "Zoom",
@@ -141,8 +144,16 @@ class ArtnetFixtureCard extends HTMLElement {
         .cross { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 6px; }
         .cross button { padding: 0; min-height: 0; min-width: 0; width: 48px; height: 48px; font-size: 18px; }
         .cross button.step { font-size: 12px; }
-        .pos { font-size: .85em; color: var(--secondary-text-color); }
-        .pos.tilt { text-align: right; }
+        .pos { display: flex; flex-direction: column; gap: 2px; font-size: .85em; color: var(--secondary-text-color); }
+        .pos.tilt { align-items: flex-end; }
+        .pos .lbl { font-weight: 500; color: var(--primary-text-color); }
+        .pos .in { display: flex; align-items: center; gap: 4px; }
+        .pos input { font: inherit; font-size: 1.15em; width: 5.2em; padding: 6px 8px; text-align: right;
+          border-radius: 8px; border: 1px solid var(--divider-color, #ccc);
+          background: var(--card-background-color, #fff); color: var(--primary-text-color); }
+        .pos input:focus { outline: 2px solid var(--primary-color, #03a9f4); border-color: transparent; }
+        .pos input.bad { outline: 2px solid var(--error-color, #db4437); }
+        .pos .rng { font-size: .85em; opacity: .8; }
         .row { display: grid; grid-template-columns: 72px minmax(0, 1fr) 56px; align-items: center; gap: 8px; margin-top: 8px; }
         .row label { font-size: .9em; }
         .row .val { text-align: right; font-size: .85em; color: var(--secondary-text-color); }
@@ -163,13 +174,13 @@ class ArtnetFixtureCard extends HTMLElement {
         <div class="move">
           <div class="pad"><div class="dot"></div></div>
           <div class="ctrl">
-            <span class="pos pan"></span>
+            <span class="pos pan"><span class="lbl">Pan</span><span class="in"><input type="text" inputmode="decimal" data-axis="pan" enterkeyhint="done"><span class="unit" data-unit="pan"></span></span><span class="rng" data-rng="pan"></span></span>
             <div class="cross">
               <span></span><button data-d="up" title="hoch">▲</button><span></span>
               <button data-d="left" title="links">◀</button><button class="home" title="Grundposition">⌂</button><button data-d="right" title="rechts">▶</button>
               <span></span><button data-d="down" title="runter">▼</button><button class="step" title="Schrittweite">fein</button>
             </div>
-            <span class="pos tilt"></span>
+            <span class="pos tilt"><span class="lbl">Tilt</span><span class="in"><input type="text" inputmode="decimal" data-axis="tilt" enterkeyhint="done"><span class="unit" data-unit="tilt"></span></span><span class="rng" data-rng="tilt"></span></span>
           </div>
         </div>` : ""}
         ${roles.light ? `<div class="row"><label>Helligkeit</label><input type="range" min="0" max="100" step="1" data-role="brightness"><span class="val" data-val="brightness"></span></div>` : ""}
@@ -246,6 +257,30 @@ class ArtnetFixtureCard extends HTMLElement {
     stepBtn?.addEventListener("click", () => {
       this._fine = !this._fine;
       stepBtn.textContent = this._fine ? "fein" : "grob";
+    });
+
+    // numeric pan / tilt entry: Enter or leaving the field sends, Esc reverts
+    root.querySelectorAll(".pos input[data-axis]").forEach((inp) => {
+      const axis = inp.dataset.axis;
+      const eid = roles[axis];
+      if (!eid) { inp.closest(".pos").style.visibility = "hidden"; return; }
+      const revert = () => { inp.classList.remove("bad"); inp._edit = false; this._render(); };
+      const commit = () => {
+        if (!inp._edit) return;
+        const n = this._axis(axis);
+        const v = parseFloat(inp.value.replace(",", "."));
+        if (!n || isNaN(v) || v < n.min || v > n.max) { inp.classList.add("bad"); return; }
+        inp.classList.remove("bad");
+        inp._edit = false;
+        this._setNumber(eid, v);
+      };
+      inp.addEventListener("focus", () => { inp._edit = true; inp.select(); });
+      inp.addEventListener("input", () => inp.classList.remove("bad"));
+      inp.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { commit(); if (!inp.classList.contains("bad")) inp.blur(); }
+        else if (ev.key === "Escape") { revert(); inp.blur(); }
+      });
+      inp.addEventListener("blur", () => { if (inp._edit) { commit(); if (inp.classList.contains("bad")) revert(); } });
     });
 
     this._built = true;
@@ -382,9 +417,13 @@ class ArtnetFixtureCard extends HTMLElement {
       if (!this._dragging) {
         this._placeDot(pan ? this._toPad("pan", pan.value) : 0.5, tilt ? this._toPad("tilt", tilt.value) : 0.5);
       }
-      const fmt = (label, n) => (n && n.value !== null ? `${label} ${Math.round(n.value * 10) / 10}${n.unit ? " " + n.unit : ""}` : "");
-      root.querySelector(".pos.pan").textContent = fmt("Pan", pan);
-      root.querySelector(".pos.tilt").textContent = fmt("Tilt", tilt);
+      for (const [axis, n] of [["pan", pan], ["tilt", tilt]]) {
+        const inp = root.querySelector(`.pos input[data-axis=${axis}]`);
+        if (!inp || !n) continue;
+        if (!inp._edit) inp.value = n.value === null ? "" : String(Math.round(n.value * 10) / 10).replace(".", ",");
+        root.querySelector(`[data-unit=${axis}]`).textContent = n.unit;
+        root.querySelector(`[data-rng=${axis}]`).textContent = `${n.min}–${n.max}${n.unit}`;
+      }
     }
     const reset = root.querySelector(".reset");
     if (reset && roles.reset) {
